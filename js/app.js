@@ -107,15 +107,18 @@ function renderBinary() {
     target.appendChild(note);
   }
 }
-function revokeImageUrls() {
-  if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+function revokePayloadImageUrl() {
   if (state.dataImageUrl) URL.revokeObjectURL(state.dataImageUrl);
-  state.imageUrl = "";
   state.dataImageUrl = "";
   $("payload-image").replaceChildren();
 }
+function revokeImageUrls() {
+  if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+  state.imageUrl = "";
+  revokePayloadImageUrl();
+}
 function renderImagePayload() {
-  revokeImageUrls();
+  revokePayloadImageUrl();
   const mime = detectImageMime(state.bytes);
   const output = $("payload-image");
   if (mime && state.bytes.length) {
@@ -180,12 +183,21 @@ async function readImageBlob(file) {
   image.src = state.imageUrl;
   image.classList.remove("hidden");
   $("image-preview-wrap").classList.remove("hidden");
+  state.activeResult = null;
+  state.bytesAreExact = false;
+  $("normal-read").disabled = true;
+  setPayload(new Uint8Array(), "", "解析中", false);
+  $("decoded-format").textContent = "解析中";
+  $("decoded-extra").textContent = "画像を解析しています。";
   setStatus("画像を解析しています…");
   try {
     const results = await decodeImage(file);
     if (!results.length) {
       state.activeResult = null;
       $("force-read").disabled = true;
+      $("normal-read").disabled = true;
+      $("decoded-format").textContent = "未判定";
+      $("decoded-extra").textContent = "QRとして復号できませんでした。SQRCかどうかは確定できません。";
       showPossibleSqrcNotice();
       setStatus("対応するQRコードを復号できませんでした。SQRCかどうかは未判定です。", "warn");
       showMeta([["規格", "未判定"], ["取得バイト列", "なし"], ["状態", "未復号"]]);
@@ -196,6 +208,11 @@ async function readImageBlob(file) {
       $("decoded-extra").textContent += " 画像内で " + results.length + " 件のコードが検出されました。現在は先頭のコードを表示しています。";
     }
   } catch (error) {
+    state.activeResult = null;
+    $("force-read").disabled = true;
+    $("normal-read").disabled = true;
+    $("decoded-format").textContent = "解析エラー";
+    $("decoded-extra").textContent = "QR画像の解析に失敗しました。";
     showPossibleSqrcNotice();
     setStatus("解析エラー: " + (error?.message || error), "error");
   }
@@ -206,6 +223,7 @@ async function readAnyFile(file) {
   try {
     const data = new Uint8Array(await file.arrayBuffer());
     state.activeResult = null;
+    $("normal-read").disabled = true;
     const utf8 = bytesToUtf8(data);
     setPayload(data, utf8.valid ? utf8.text : "(UTF-8として無効。HEX/ASCIIで確認してください)", "ファイル入力: " + file.name, true);
     $("decoded-format").textContent = "QRではなくファイルのバイト列";
@@ -309,6 +327,7 @@ function applyHexInput() {
   try {
     const data = parseHex($("hex-input").value);
     state.activeResult = null;
+    $("normal-read").disabled = true;
     const utf8 = bytesToUtf8(data);
     setPayload(data, utf8.valid ? utf8.text : "(UTF-8として無効。HEX/ASCIIで確認してください)", "手動HEX入力", true);
     $("decoded-format").textContent = "手動HEX入力";
@@ -324,6 +343,7 @@ function applyTextInput() {
   const value = $("text-input").value;
   const data = new TextEncoder().encode(value);
   state.activeResult = null;
+  $("normal-read").disabled = true;
   setPayload(data, value, "テキスト入力をUTF-8変換", false);
   $("decoded-format").textContent = "テキスト入力";
   $("decoded-extra").textContent = "テキストから生成したUTF-8バイト列です。QRコードから復元した元データではありません。";
