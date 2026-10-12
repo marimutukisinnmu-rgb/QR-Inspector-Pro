@@ -96,3 +96,9 @@ footer a { color: var(--blue); }
 @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } header { align-items: flex-start; } .status-pill { display: none; } }
 @media (max-width: 480px) { .app { padding: .75rem; } .panel { padding: .85rem; } .meta-grid { grid-template-columns: 1fr; } .actions button { flex: 1 1 auto; } .brand { align-items: flex-start; } .logo { width: 40px; height: 40px; border-radius: 12px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+
+.field-label { display: block; color: var(--muted); font-size: .8rem; margin: .75rem 0 .35rem; }
+#result-selector { display: block; width: 100%; color: var(--text); background: #080d16; border: 1px solid var(--line); border-radius: 9px; padding: .7rem; }
+#result-selector:disabled { opacity: .65; }
+.result-format { margin-top: .5rem; }
+.drop-zone:focus-visible, button:focus-visible, .button:focus-visible, #result-selector:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
