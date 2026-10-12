@@ -1,7 +1,7 @@
 export function parseHex(input) {
   const trimmed = String(input ?? "").trim();
   if (!trimmed) throw new Error("HEXデータが空です。");
-  const tokens = trimmed.split(/[\\s,:;-]+/).filter(Boolean);
+  const tokens = trimmed.split(/[\s,:;-]+/).filter(Boolean);
   if (tokens.some(token => !/^(?:0x)?[0-9a-f]{2}$/i.test(token))) {
     throw new Error("各バイトを2桁の16進数で入力してください（例: 00 FF 80）。");
   }
@@ -37,18 +37,18 @@ export function detectImageMime(bytes) {
 export function classifyPayload(bytes, text = "") {
   const mime = detectImageMime(bytes);
   if (mime) return { kind: "画像バイナリ", mime };
-  if (/^https?:\\/\\//i.test(text)) return { kind: "URL", mime: "" };
-  if (/^data:image\\//i.test(text)) return { kind: "画像Data URL", mime: "" };
+  if (/^https?:\/\//i.test(text)) return { kind: "URL", mime: "" };
+  if (/^data:image\//i.test(text)) return { kind: "画像Data URL", mime: "" };
   const decoded = bytesToUtf8(bytes);
-  if (decoded.valid && /^[\\x09\\x0a\\x0d\\x20-\\x7e]*$/.test(decoded.text)) return { kind: "テキスト", mime: "" };
+  if (decoded.valid && /^[\x09\x0a\x0d\x20-\x7e]*$/.test(decoded.text)) return { kind: "テキスト", mime: "" };
   if (decoded.valid) return { kind: "UTF-8テキスト（非ASCII）", mime: "" };
   return { kind: "バイナリ / UTF-8以外", mime: "" };
 }
 
 /**
  * A standard Model 2 QR has side length 21 + 4 * (version - 1).
- * This helper only validates a known module-grid dimension; it does not
- * infer a QR version from an arbitrary raster image's pixel dimensions.
+ * This validates a known module-grid dimension; it does not infer a version
+ * from an arbitrary raster image's pixel dimensions.
  */
 export function standardQrVersionFromModules(sideModules) {
   if (!Number.isInteger(sideModules) || sideModules < 21 || sideModules > 177 || (sideModules - 21) % 4 !== 0) return null;
