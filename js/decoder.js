@@ -9,11 +9,10 @@ export function getDecoder() {
 }
 
 /**
- * Reads an ImageData, Blob, File, or supported image byte input with ZXing-C++.
- * Result bytes are copied out of WASM-backed memory immediately.
- *
- * Important: result.bytes is decoded payload data provided by the decoder,
- * not QR codewords, a raw module grid, or a guarantee of the original bitstream.
+ * Decode image input via ZXing-C++ WebAssembly.
+ * ReadResult.bytes is the decoder's raw/standard payload content (without
+ * character-set conversion). It is NOT the complete QR codeword stream or
+ * a dump of all QR module bits.
  */
 export async function decodeImage(input) {
   const api = getDecoder();
@@ -22,50 +21,50 @@ export async function decodeImage(input) {
     tryHarder: true,
     tryRotate: true,
     tryInvert: true,
+    tryDownscale: true,
     maxNumberOfSymbols: 10,
     textMode: "Plain",
+    characterSet: "Unknown"
   });
 
   return (results || [])
-    .filter(item => item && !item.error && (item.format || item.symbology))
+    .filter(item => item && !item.error && item.isValid !== false && (item.format || item.symbology))
     .map(item => ({
       format: String(item.format || item.symbology || "Unknown"),
       symbology: String(item.symbology || item.format || "Unknown"),
       text: typeof item.text === "string" ? item.text : "",
-      bytes: item.bytes ? new Uint8Array(item.bytes) : null,
-      bytesECI: item.bytesECI ? new Uint8Array(item.bytesECI) : null,
+      bytes: item.bytes instanceof Uint8Array ? new Uint8Array(item.bytes) : null,
+      bytesECI: item.bytesECI instanceof Uint8Array ? new Uint8Array(item.bytesECI) : null,
       hasECI: Boolean(item.hasECI),
       contentType: item.contentType ?? null,
       version: item.version ?? null,
       ecLevel: item.ecLevel ?? "",
       position: item.position ?? null,
-      rotation: item.rotation ?? null,
+      rotation: item.rotation ?? item.orientation ?? null,
       isMirrored: Boolean(item.isMirrored),
       isInverted: Boolean(item.isInverted),
       symbologyIdentifier: item.symbologyIdentifier ?? "",
       sequenceSize: item.sequenceSize ?? null,
       sequenceIndex: item.sequenceIndex ?? null,
       sequenceId: item.sequenceId ?? null,
-      extra: item.extra ?? "",
+      symbol: item.symbol && item.symbol.data instanceof Uint8ClampedArray
+        ? { data: new Uint8ClampedArray(item.symbol.data), width: item.symbol.width, height: item.symbol.height }
+        : null,
+      extra: item.extra ?? ""
     }));
 }
 
 export function formatName(format) {
   const names = {
-    QRCode: "通常QRコード（モデル2系）",
+    QRCode: "QRコード",
     QRCodeModel1: "QRコード Model 1",
     QRCodeModel2: "QRコード Model 2",
     MicroQRCode: "Micro QR",
-    RMQRCode: "rMQR（長方形QR）",
+    RMQRCode: "rMQR（長方形QR）"
   };
   return names[format] || format || "不明";
 }
 
-/**
- * SQRC keeps the visual/symbology appearance of regular QR. A generic decoder
- * cannot reliably identify SQRC solely from the printed pattern. Never infer
- * SQRC from garbled text or claim its private payload was recovered.
- */
 export function sqrcDetectionNotice() {
-  return "SQRCは通常QRコードと同じ外観・基本特性を持つため、この汎用デコーダーだけでは確実に自動判定できません。表示するバイト列はデコーダーが実際に返した取得済みペイロードです。";
+  return "SQRCは通常QRと同じ外観で、公開部と非公開部を持ちます。通常のデコード結果だけではSQRCかどうかを確定できません。0100は標準QRの4ビットByteモード指示子です。SQRCの独自モード検出には、誤り訂正後のデータビットストリームと、検証済みの専用指示子が必要です。";
 }
