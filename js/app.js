@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 const state = {
   bytes: new Uint8Array(), text: "", decodedText: "", activeResult: null,
   bytesAreExact: false, view: "hex", stream: null, scanning: false,
-  scanBusy: false, lastScan: 0, imageUrl: "", dataImageUrl: ""
+  scanBusy: false, lastScan: 0, imageUrl: "", dataImageUrl: "", results: []
 };
 
 function setStatus(message, tone = "") {
@@ -178,6 +178,10 @@ async function readImageBlob(file) {
   }
   stopCamera();
   revokeImageUrls();
+  state.results = [];
+  const selector = $("result-selector");
+  selector.replaceChildren(new Option("解析中…", ""));
+  selector.disabled = true;
   state.imageUrl = URL.createObjectURL(file);
   const image = $("image-preview");
   image.src = state.imageUrl;
@@ -203,9 +207,20 @@ async function readImageBlob(file) {
       showMeta([["規格", "未判定"], ["取得バイト列", "なし"], ["状態", "未復号"]]);
       return;
     }
+    state.results = results;
+    const selector = $("result-selector");
+    selector.replaceChildren(...results.map((result, index) => {
+      const option = new Option(
+        (index + 1) + ". " + formatName(result.format) + " — " + ((result.text || "").slice(0, 48) || (result.bytes?.length ?? 0) + " bytes"),
+        String(index)
+      );
+      return option;
+    }));
+    selector.disabled = results.length < 2;
+    selector.value = "0";
     showDecodeResult(results[0]);
     if (results.length > 1) {
-      $("decoded-extra").textContent += " 画像内で " + results.length + " 件のコードが検出されました。現在は先頭のコードを表示しています。";
+      $("decoded-extra").textContent += " 画像内で " + results.length + " 件のコードが検出されました。上の選択欄から切り替えられます。";
     }
   } catch (error) {
     state.activeResult = null;
@@ -311,6 +326,14 @@ async function scanCameraFrame() {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const results = await decodeImage(context.getImageData(0, 0, canvas.width, canvas.height));
       if (results.length) {
+        state.results = results;
+        const selector = $("result-selector");
+        selector.replaceChildren(...results.map((result, index) => new Option(
+          (index + 1) + ". " + formatName(result.format) + " — " + ((result.text || "").slice(0, 48) || (result.bytes?.length ?? 0) + " bytes"),
+          String(index)
+        )));
+        selector.disabled = results.length < 2;
+        selector.value = "0";
         showDecodeResult(results[0]);
         stopCamera();
         state.scanBusy = false;
@@ -366,8 +389,11 @@ function clearAll() {
   state.text = "";
   state.decodedText = "";
   state.activeResult = null;
+  state.results = [];
   state.bytesAreExact = false;
   state.view = "hex";
+  $("result-selector").replaceChildren(new Option("未検出", ""));
+  $("result-selector").disabled = true;
   $("image-file").value = "";
   $("binary-file").value = "";
   $("image-preview").removeAttribute("src");
@@ -437,6 +463,10 @@ $("view-text").addEventListener("click", () => {
   $("view-hex").setAttribute("aria-pressed", "false");
   $("view-text").setAttribute("aria-pressed", "true");
   renderBinary();
+});
+$("result-selector").addEventListener("change", event => {
+  const index = Number.parseInt(event.target.value, 10);
+  if (Number.isInteger(index) && state.results[index]) showDecodeResult(state.results[index]);
 });
 $("copy-text").addEventListener("click", () => copyText(state.text, "テキスト"));
 $("copy-hex").addEventListener("click", () => copyText(bytesToHex(state.bytes), "HEX"));
